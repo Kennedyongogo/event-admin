@@ -36,7 +36,7 @@ import {
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
 
-const images = ["/beth1.jpg", "/beth2.jpg", "/beth3.jpg"];
+const images = ["/ticka1.png", "/ticka2.png", "/ticka3.png"];
 
 export default function LoginPage(props) {
   const theme = useTheme();
@@ -317,21 +317,27 @@ export default function LoginPage(props) {
                   <Slide direction="up" in timeout={1200}>
                     <Box>
                       <Typography
-                        variant="h2"
+                        variant="h1"
                         sx={{
                           color: "#fff",
-                          fontWeight: 700,
-                          fontSize: { xs: "2rem", sm: "2.5rem", md: "3rem" },
+                          fontWeight: 800,
+                          fontSize: {
+                            xs: "3rem",
+                            sm: "4rem",
+                            md: "5rem",
+                            lg: "6rem",
+                          },
                           textAlign: { xs: "center", md: "left" },
-                          letterSpacing: "1px",
+                          letterSpacing: "2px",
                           mb: 2,
                           background: `linear-gradient(45deg, ${theme.palette.primary.light}, ${theme.palette.secondary.light})`,
                           backgroundClip: "text",
                           WebkitBackgroundClip: "text",
                           WebkitTextFillColor: "transparent",
+                          textShadow: "0 0 30px rgba(255,255,255,0.3)",
                         }}
                       >
-                        Betheltus Construction LTD
+                        TickaZone
                       </Typography>
                     </Box>
                   </Slide>
@@ -544,58 +550,6 @@ export default function LoginPage(props) {
               </Slide>
             </Grid>
           </Grid>
-
-          {/* Footer with logos */}
-          <Fade in timeout={2000}>
-            <Box
-              sx={{
-                position: "fixed",
-                bottom: 20,
-                left: "50%",
-                transform: "translateX(-50%)",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                background: "rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(25px)",
-                p: 2,
-                borderRadius: 3,
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                transition: "all 0.3s ease",
-                "&:hover": {
-                  background: "rgba(255, 255, 255, 0.15)",
-                  transform: "translateX(-50%) translateY(-2px)",
-                },
-              }}
-            >
-              <Box>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "#fff",
-                    display: "block",
-                    textAlign: "center",
-                    fontWeight: 500,
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  Powered by
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    color: "#fff",
-                    fontWeight: 600,
-                    letterSpacing: "1px",
-                    textShadow: "2px 2px 4px rgba(0,0,0,0.5)",
-                  }}
-                >
-                  Carl Solutions
-                </Typography>
-              </Box>
-            </Box>
-          </Fade>
         </Container>
       </Box>
 

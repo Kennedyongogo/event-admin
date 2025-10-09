@@ -53,6 +53,8 @@ import {
   CheckCircle,
   Schedule,
   Cancel as InactiveIcon,
+  Check as ApproveIcon,
+  Block as SuspendIcon,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import Swal from "sweetalert2";
@@ -95,6 +97,15 @@ const UsersTable = () => {
     profile_picture: null,
     profile_picture_preview: "",
     isActive: true,
+    // Event organizer specific fields
+    organization_name: "",
+    contact_person: "",
+    phone_number: "",
+    address: "",
+    kra_pin: "",
+    bank_name: "",
+    bank_account_number: "",
+    website: "",
   });
 
   useEffect(() => {
@@ -118,7 +129,7 @@ const UsersTable = () => {
       });
 
       // Choose endpoint based on active tab
-      const endpoint = activeTab === 0 ? "/api/admins" : "/api/users";
+      const endpoint = activeTab === 0 ? "/api/admins" : "/api/organizers";
 
       const response = await fetch(`${endpoint}?${queryParams}`, {
         method: "GET",
@@ -173,6 +184,20 @@ const UsersTable = () => {
     return isActive ? "success" : "error";
   };
 
+  const getStatusColorForOrganizer = (status) => {
+    switch (status) {
+      case "approved":
+      case "active":
+        return "success";
+      case "pending":
+        return "warning";
+      case "suspended":
+        return "error";
+      default:
+        return "default";
+    }
+  };
+
   const getInitials = (name) => {
     if (!name) return "U";
     const parts = name.trim().split(/\s+/);
@@ -217,27 +242,66 @@ const UsersTable = () => {
 
     // Convert file path to URL for display (same as blueprints)
     let profilePictureUrl = "";
-    if (user.profile_picture) {
-      profilePictureUrl = buildImageUrl(user.profile_picture);
+    if (user.profile_picture || user.profile_image || user.logo) {
+      profilePictureUrl = buildImageUrl(
+        user.profile_picture || user.profile_image || user.logo
+      );
     }
 
-    setUserForm({
-      name: user.name || "",
-      email: user.email || "",
-      phone: user.phone || "",
-      role: user.role || "engineer",
-      password: "",
-      profile_picture: null,
-      profile_picture_preview: profilePictureUrl,
-      isActive: user.isActive !== undefined ? user.isActive : true,
-    });
+    // Check if this is admin or organizer based on activeTab
+    if (activeTab === 0) {
+      // Admin user form
+      setUserForm({
+        name: user.full_name || user.name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        role: user.role || "engineer",
+        password: "",
+        profile_picture: null,
+        profile_picture_preview: profilePictureUrl,
+        isActive: user.isActive !== undefined ? user.isActive : true,
+        organization_name: "",
+        contact_person: "",
+        phone_number: "",
+        address: "",
+        kra_pin: "",
+        bank_name: "",
+        bank_account_number: "",
+        website: "",
+      });
+    } else {
+      // Event organizer form
+      setUserForm({
+        name: "",
+        email: user.email || "",
+        phone: "",
+        role: "engineer",
+        password: "",
+        profile_picture: null,
+        profile_picture_preview: profilePictureUrl,
+        isActive: user.isActive !== undefined ? user.isActive : true,
+        organization_name: user.organization_name || "",
+        contact_person: user.contact_person || "",
+        phone_number: user.phone_number || "",
+        address: user.address || "",
+        kra_pin: user.kra_pin || "",
+        bank_name: user.bank_name || "",
+        bank_account_number: user.bank_account_number || "",
+        website: user.website || "",
+      });
+    }
     setOpenEditDialog(true);
   };
 
   const handleDeleteUser = async (user) => {
+    const userName =
+      activeTab === 0
+        ? user.full_name || user.name
+        : user.organization_name || user.name;
+
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: `Do you want to delete "${user.name}"?`,
+      text: `Do you want to delete "${userName}"?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -293,6 +357,122 @@ const UsersTable = () => {
     }
   };
 
+  const handleApproveOrganizer = async (organizer) => {
+    const result = await Swal.fire({
+      title: "Approve Organizer?",
+      text: `Approve "${organizer.organization_name}" to start creating events?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#27ae60",
+      cancelButtonColor: "#95a5a6",
+      confirmButtonText: "Yes, approve!",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          setError("No authentication token found. Please login again.");
+          return;
+        }
+
+        const response = await fetch(
+          `/api/organizers/${organizer.id}/approve`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to approve organizer");
+        }
+
+        fetchUsers();
+
+        Swal.fire({
+          icon: "success",
+          title: "Approved!",
+          text: "Organizer has been approved successfully.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } catch (err) {
+        console.error("Error approving organizer:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err.message || "Failed to approve organizer. Please try again.",
+        });
+      }
+    }
+  };
+
+  const handleSuspendOrganizer = async (organizer) => {
+    const result = await Swal.fire({
+      title: "Suspend Organizer?",
+      text: `Suspend "${organizer.organization_name}"? They won't be able to create events.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#e74c3c",
+      cancelButtonColor: "#95a5a6",
+      confirmButtonText: "Yes, suspend!",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          setError("No authentication token found. Please login again.");
+          return;
+        }
+
+        const response = await fetch(
+          `/api/organizers/${organizer.id}/suspend`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to suspend organizer");
+        }
+
+        fetchUsers();
+
+        Swal.fire({
+          icon: "success",
+          title: "Suspended!",
+          text: "Organizer has been suspended successfully.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } catch (err) {
+        console.error("Error suspending organizer:", err);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err.message || "Failed to suspend organizer. Please try again.",
+        });
+      }
+    }
+  };
+
   const handleUpdateUser = async () => {
     try {
       setIsUpdating(true);
@@ -304,18 +484,37 @@ const UsersTable = () => {
       }
 
       const formData = new FormData();
-      formData.append("name", userForm.name);
-      formData.append("email", userForm.email);
-      formData.append("phone", userForm.phone);
-      formData.append("role", userForm.role);
-      formData.append("isActive", userForm.isActive);
+
+      // Add fields based on active tab
+      if (activeTab === 0) {
+        // Admin user fields
+        formData.append("full_name", userForm.name);
+        formData.append("email", userForm.email);
+        formData.append("phone", userForm.phone);
+        formData.append("role", userForm.role);
+        formData.append("isActive", userForm.isActive);
+      } else {
+        // Event organizer fields
+        formData.append("organization_name", userForm.organization_name);
+        formData.append("contact_person", userForm.contact_person);
+        formData.append("email", userForm.email);
+        formData.append("phone_number", userForm.phone_number);
+        formData.append("address", userForm.address);
+        formData.append("kra_pin", userForm.kra_pin);
+        formData.append("bank_name", userForm.bank_name);
+        formData.append("bank_account_number", userForm.bank_account_number);
+        formData.append("website", userForm.website);
+      }
 
       if (userForm.profile_picture) {
-        formData.append("profile_picture", userForm.profile_picture);
+        formData.append(
+          activeTab === 0 ? "profile_image" : "logo",
+          userForm.profile_picture
+        );
       }
 
       // Choose endpoint based on active tab
-      const endpoint = activeTab === 0 ? "/api/admins" : "/api/users";
+      const endpoint = activeTab === 0 ? "/api/admins" : "/api/organizers";
 
       const response = await fetch(`${endpoint}/${selectedUser.id}`, {
         method: "PUT",
@@ -340,6 +539,14 @@ const UsersTable = () => {
         profile_picture: null,
         profile_picture_preview: "",
         isActive: true,
+        organization_name: "",
+        contact_person: "",
+        phone_number: "",
+        address: "",
+        kra_pin: "",
+        bank_name: "",
+        bank_account_number: "",
+        website: "",
       });
       setOpenEditDialog(false);
       setSelectedUser(null);
@@ -376,19 +583,39 @@ const UsersTable = () => {
       }
 
       const formData = new FormData();
-      formData.append("name", userForm.name);
-      formData.append("email", userForm.email);
-      formData.append("phone", userForm.phone);
-      formData.append("role", userForm.role);
-      formData.append("password", userForm.password);
-      formData.append("isActive", userForm.isActive);
+
+      // Add fields based on active tab
+      if (activeTab === 0) {
+        // Admin user fields
+        formData.append("full_name", userForm.name);
+        formData.append("email", userForm.email);
+        formData.append("phone", userForm.phone);
+        formData.append("role", userForm.role);
+        formData.append("password", userForm.password);
+        formData.append("isActive", userForm.isActive);
+      } else {
+        // Event organizer fields
+        formData.append("organization_name", userForm.organization_name);
+        formData.append("contact_person", userForm.contact_person);
+        formData.append("email", userForm.email);
+        formData.append("phone_number", userForm.phone_number);
+        formData.append("password", userForm.password);
+        formData.append("address", userForm.address);
+        formData.append("kra_pin", userForm.kra_pin);
+        formData.append("bank_name", userForm.bank_name);
+        formData.append("bank_account_number", userForm.bank_account_number);
+        formData.append("website", userForm.website);
+      }
 
       if (userForm.profile_picture) {
-        formData.append("profile_picture", userForm.profile_picture);
+        formData.append(
+          activeTab === 0 ? "profile_image" : "logo",
+          userForm.profile_picture
+        );
       }
 
       // Choose endpoint based on active tab
-      const endpoint = activeTab === 0 ? "/api/admins" : "/api/users";
+      const endpoint = activeTab === 0 ? "/api/admins" : "/api/organizers";
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -413,6 +640,14 @@ const UsersTable = () => {
         profile_picture: null,
         profile_picture_preview: "",
         isActive: true,
+        organization_name: "",
+        contact_person: "",
+        phone_number: "",
+        address: "",
+        kra_pin: "",
+        bank_name: "",
+        bank_account_number: "",
+        website: "",
       });
       setOpenCreateDialog(false);
       setSelectedUser(null);
@@ -512,12 +747,12 @@ const UsersTable = () => {
               >
                 {activeTab === 0
                   ? "Admin Users Management"
-                  : "Public Users Management"}
+                  : "Event Organizers Management"}
               </Typography>
               <Typography variant="body1" sx={{ opacity: 0.9 }}>
                 {activeTab === 0
                   ? "Manage admin users and permissions"
-                  : "Manage public users and accounts"}
+                  : "Manage event organizers and their accounts"}
               </Typography>
             </Box>
             {activeTab === 0 && (
@@ -557,7 +792,7 @@ const UsersTable = () => {
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
               >
-                Create New User
+                Create New Admin
               </Button>
             )}
           </Box>
@@ -592,7 +827,7 @@ const UsersTable = () => {
               }}
             >
               <Tab label="Admin Users" />
-              <Tab label="Public Users" />
+              <Tab label="Event Organizers" />
             </Tabs>
           </Box>
 
@@ -637,9 +872,13 @@ const UsersTable = () => {
                   }}
                 >
                   <TableCell>No</TableCell>
-                  <TableCell>Name</TableCell>
+                  <TableCell>
+                    {activeTab === 0 ? "Name" : "Organization"}
+                  </TableCell>
+                  <TableCell>
+                    {activeTab === 0 ? "Phone" : "Contact Person"}
+                  </TableCell>
                   <TableCell>Email</TableCell>
-                  <TableCell>{activeTab === 0 ? "Role" : "Type"}</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -663,7 +902,9 @@ const UsersTable = () => {
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                       <Typography variant="h6" color="text.secondary">
-                        No users found.
+                        {activeTab === 0
+                          ? "No admin users found."
+                          : "No event organizers found."}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -696,7 +937,16 @@ const UsersTable = () => {
                           fontWeight="600"
                           sx={{ color: "#2c3e50" }}
                         >
-                          {user.name}
+                          {activeTab === 0
+                            ? user.full_name || user.name
+                            : user.organization_name || "N/A"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ color: "#7f8c8d" }}>
+                          {activeTab === 0
+                            ? user.phone || "N/A"
+                            : user.contact_person || "N/A"}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -708,27 +958,16 @@ const UsersTable = () => {
                         <Chip
                           label={
                             activeTab === 0
-                              ? user.role?.replace("_", " ") || "N/A"
-                              : user.type?.replace("_", " ") || "N/A"
+                              ? user.isActive
+                                ? "Active"
+                                : "Inactive"
+                              : user.status || "pending"
                           }
                           color={
                             activeTab === 0
-                              ? getRoleColor(user.role)
-                              : getTypeColor(user.type)
+                              ? getStatusColor(user.isActive)
+                              : getStatusColorForOrganizer(user.status)
                           }
-                          size="small"
-                          variant="outlined"
-                          sx={{
-                            textTransform: "capitalize",
-                            fontWeight: 600,
-                            borderRadius: 2,
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={user.isActive ? "Active" : "Inactive"}
-                          color={getStatusColor(user.isActive)}
                           size="small"
                           variant="outlined"
                           sx={{
@@ -758,7 +997,7 @@ const UsersTable = () => {
                               <ViewIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {activeTab === 0 && (
+                          {activeTab === 0 ? (
                             <>
                               <Tooltip title="Edit User" arrow>
                                 <IconButton
@@ -797,6 +1036,54 @@ const UsersTable = () => {
                                   <DeleteIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                            </>
+                          ) : (
+                            <>
+                              {(user.status === "pending" ||
+                                user.status === "suspended") && (
+                                <Tooltip title="Approve Organizer" arrow>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleApproveOrganizer(user)}
+                                    sx={{
+                                      color: "#27ae60",
+                                      backgroundColor: "rgba(39, 174, 96, 0.1)",
+                                      "&:hover": {
+                                        backgroundColor:
+                                          "rgba(39, 174, 96, 0.2)",
+                                        transform: "scale(1.1)",
+                                      },
+                                      transition: "all 0.2s ease",
+                                      borderRadius: 2,
+                                    }}
+                                  >
+                                    <ApproveIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              {(user.status === "approved" ||
+                                user.status === "active") && (
+                                <Tooltip title="Suspend Organizer" arrow>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleSuspendOrganizer(user)}
+                                    sx={{
+                                      color: "#e67e22",
+                                      backgroundColor:
+                                        "rgba(230, 126, 34, 0.1)",
+                                      "&:hover": {
+                                        backgroundColor:
+                                          "rgba(230, 126, 34, 0.2)",
+                                        transform: "scale(1.1)",
+                                      },
+                                      transition: "all 0.2s ease",
+                                      borderRadius: 2,
+                                    }}
+                                  >
+                                    <SuspendIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                             </>
                           )}
                         </Box>
@@ -904,14 +1191,14 @@ const UsersTable = () => {
                   ? "User Details"
                   : openEditDialog
                   ? "Edit User"
-                  : "Create New User"}
+                  : "Create New Admin"}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
                 {openViewDialog
                   ? "View user information"
                   : openEditDialog
                   ? "Update user details"
-                  : "Add a new user to the system"}
+                  : "Add a new admin to the system"}
               </Typography>
             </Box>
           </DialogTitle>
@@ -959,7 +1246,9 @@ const UsersTable = () => {
                         WebkitTextFillColor: "transparent",
                       }}
                     >
-                      {selectedUser?.name}
+                      {activeTab === 0
+                        ? selectedUser?.full_name || selectedUser?.name
+                        : selectedUser?.organization_name || "N/A"}
                     </Typography>
                     <Typography
                       variant="body1"
@@ -976,13 +1265,17 @@ const UsersTable = () => {
                 </Box>
 
                 {/* Profile Picture Display */}
-                {selectedUser?.profile_picture && (
+                {(selectedUser?.profile_picture ||
+                  selectedUser?.profile_image ||
+                  selectedUser?.logo) && (
                   <Box sx={{ textAlign: "center", mb: 3 }}>
                     <Typography
                       variant="h6"
                       sx={{ mb: 2, color: "#2c3e50", fontWeight: 600 }}
                     >
-                      Profile Picture
+                      {activeTab === 0
+                        ? "Profile Picture"
+                        : "Organization Logo"}
                     </Typography>
                     <Box
                       sx={{
@@ -999,15 +1292,25 @@ const UsersTable = () => {
                       }}
                       onClick={() => {
                         const fullImageUrl = buildImageUrl(
-                          selectedUser.profile_picture
+                          selectedUser.profile_picture ||
+                            selectedUser.profile_image ||
+                            selectedUser.logo
                         );
                         window.open(fullImageUrl, "_blank");
                       }}
                     >
                       <Box
                         component="img"
-                        src={buildImageUrl(selectedUser.profile_picture)}
-                        alt="Profile Picture"
+                        src={buildImageUrl(
+                          selectedUser.profile_picture ||
+                            selectedUser.profile_image ||
+                            selectedUser.logo
+                        )}
+                        alt={
+                          activeTab === 0
+                            ? "Profile Picture"
+                            : "Organization Logo"
+                        }
                         sx={{
                           width: 150,
                           height: 150,
@@ -1051,7 +1354,9 @@ const UsersTable = () => {
                             textAlign: "center",
                           }}
                         >
-                          Profile Picture
+                          {activeTab === 0
+                            ? "Profile Picture"
+                            : "Organization Logo"}
                         </Typography>
                       </Box>
                     </Box>
@@ -1075,12 +1380,12 @@ const UsersTable = () => {
                         <PersonIcon sx={{ fontSize: 24 }} />
                         <Box>
                           <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                            {activeTab === 0 ? "ROLE" : "TYPE"}
+                            {activeTab === 0 ? "ROLE" : "CONTACT PERSON"}
                           </Typography>
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
                             {activeTab === 0
                               ? selectedUser?.role?.replace("_", " ") || "N/A"
-                              : selectedUser?.type?.replace("_", " ") || "N/A"}
+                              : selectedUser?.contact_person || "N/A"}
                           </Typography>
                         </Box>
                       </Box>
@@ -1105,7 +1410,9 @@ const UsersTable = () => {
                             PHONE
                           </Typography>
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {selectedUser?.phone || "N/A"}
+                            {activeTab === 0
+                              ? selectedUser?.phone || "N/A"
+                              : selectedUser?.phone_number || "N/A"}
                           </Typography>
                         </Box>
                       </Box>
@@ -1130,7 +1437,11 @@ const UsersTable = () => {
                             STATUS
                           </Typography>
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {selectedUser?.isActive ? "Active" : "Inactive"}
+                            {activeTab === 0
+                              ? selectedUser?.isActive
+                                ? "Active"
+                                : "Inactive"
+                              : selectedUser?.status || "pending"}
                           </Typography>
                         </Box>
                       </Box>
@@ -1176,247 +1487,146 @@ const UsersTable = () => {
                     Additional Information
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "#7f8c8d", mb: 0.5 }}
-                      >
-                        <strong>Created:</strong>{" "}
-                        {selectedUser?.createdAt
-                          ? new Date(
-                              selectedUser.createdAt
-                            ).toLocaleDateString()
-                          : "N/A"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="body2"
-                        sx={{ color: "#7f8c8d", mb: 0.5 }}
-                      >
-                        <strong>Last Updated:</strong>{" "}
-                        {selectedUser?.updatedAt
-                          ? new Date(
-                              selectedUser.updatedAt
-                            ).toLocaleDateString()
-                          : "N/A"}
-                      </Typography>
-                    </Grid>
+                    {activeTab === 0 ? (
+                      <>
+                        {/* Admin User Additional Info */}
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Department:</strong>{" "}
+                            {selectedUser?.department || "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Created:</strong>{" "}
+                            {selectedUser?.createdAt
+                              ? new Date(
+                                  selectedUser.createdAt
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Last Updated:</strong>{" "}
+                            {selectedUser?.updatedAt
+                              ? new Date(
+                                  selectedUser.updatedAt
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </Typography>
+                        </Grid>
+                      </>
+                    ) : (
+                      <>
+                        {/* Event Organizer Additional Info */}
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Address:</strong>{" "}
+                            {selectedUser?.address || "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>KRA PIN:</strong>{" "}
+                            {selectedUser?.kra_pin || "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Bank Name:</strong>{" "}
+                            {selectedUser?.bank_name || "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Bank Account:</strong>{" "}
+                            {selectedUser?.bank_account_number || "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Website:</strong>{" "}
+                            {selectedUser?.website ? (
+                              <a
+                                href={selectedUser.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  color: "#667eea",
+                                  textDecoration: "none",
+                                }}
+                              >
+                                {selectedUser.website}
+                              </a>
+                            ) : (
+                              "N/A"
+                            )}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Pesapal Merchant Ref:</strong>{" "}
+                            {selectedUser?.pesapal_merchant_ref || "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Created:</strong>{" "}
+                            {selectedUser?.createdAt
+                              ? new Date(
+                                  selectedUser.createdAt
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "#7f8c8d", mb: 0.5 }}
+                          >
+                            <strong>Last Updated:</strong>{" "}
+                            {selectedUser?.updatedAt
+                              ? new Date(
+                                  selectedUser.updatedAt
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </Typography>
+                        </Grid>
+                      </>
+                    )}
                   </Grid>
                 </Box>
-
-                {/* Managed Projects Section */}
-                {selectedUser?.managedProjects &&
-                  selectedUser.managedProjects.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{ fontWeight: 600, mb: 2, color: "#2c3e50" }}
-                      >
-                        Managed Projects ({selectedUser.managedProjects.length})
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {selectedUser.managedProjects.map((project) => (
-                          <Grid item xs={12} sm={6} md={4} key={project.id}>
-                            <Card
-                              sx={{
-                                background:
-                                  "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                color: "white",
-                                borderRadius: 3,
-                                p: 2,
-                                height: "100%",
-                                boxShadow:
-                                  "0 8px 25px rgba(102, 126, 234, 0.3)",
-                              }}
-                            >
-                              <Typography
-                                variant="subtitle1"
-                                sx={{ fontWeight: 600, mb: 1 }}
-                              >
-                                {project.name}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{ opacity: 0.9, mb: 1 }}
-                              >
-                                Status: {project.status}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{ opacity: 0.9, mb: 1 }}
-                              >
-                                Progress: {project.progress_percent}%
-                              </Typography>
-                            </Card>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Box>
-                  )}
-
-                {/* Submitted Issues Section (for public users) */}
-                {activeTab === 1 &&
-                  selectedUser?.submittedIssues &&
-                  selectedUser.submittedIssues.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{ fontWeight: 600, mb: 2, color: "#2c3e50" }}
-                      >
-                        Submitted Issues ({selectedUser.submittedIssues.length})
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {selectedUser.submittedIssues.map((issue) => (
-                          <Grid item xs={12} sm={6} md={4} key={issue.id}>
-                            <Card
-                              sx={{
-                                background:
-                                  "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
-                                color: "white",
-                                borderRadius: 3,
-                                p: 2,
-                                height: "100%",
-                                boxShadow: "0 8px 25px rgba(231, 76, 60, 0.3)",
-                              }}
-                            >
-                              <Typography
-                                variant="subtitle1"
-                                sx={{ fontWeight: 600, mb: 1 }}
-                              >
-                                Issue #{issue.id.slice(-8)}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{ opacity: 0.9, mb: 1 }}
-                              >
-                                Status: {issue.status}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{ opacity: 0.9, fontSize: "0.75rem" }}
-                              >
-                                Reported:{" "}
-                                {issue.date_reported
-                                  ? new Date(
-                                      issue.date_reported
-                                    ).toLocaleDateString()
-                                  : "N/A"}
-                              </Typography>
-                            </Card>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Box>
-                  )}
-
-                {/* Assigned Tasks Section */}
-                {selectedUser?.assignedTasks &&
-                  selectedUser.assignedTasks.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{ fontWeight: 600, mb: 2, color: "#2c3e50" }}
-                      >
-                        Assigned Tasks ({selectedUser.assignedTasks.length})
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {selectedUser.assignedTasks.map((task) => (
-                          <Grid item xs={12} sm={6} md={4} key={task.id}>
-                            <Card
-                              sx={{
-                                background:
-                                  "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)",
-                                color: "white",
-                                borderRadius: 3,
-                                p: 2,
-                                height: "100%",
-                                boxShadow:
-                                  "0 8px 25px rgba(255, 107, 107, 0.3)",
-                              }}
-                            >
-                              <Typography
-                                variant="subtitle1"
-                                sx={{ fontWeight: 600, mb: 1 }}
-                              >
-                                {task.name}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{ opacity: 0.9, mb: 1 }}
-                              >
-                                Status: {task.status}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{ opacity: 0.9, mb: 1 }}
-                              >
-                                Progress: {task.progress_percent}%
-                              </Typography>
-                            </Card>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Box>
-                  )}
-
-                {/* Uploaded Documents Section */}
-                {selectedUser?.uploadedDocuments &&
-                  selectedUser.uploadedDocuments.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{ fontWeight: 600, mb: 2, color: "#2c3e50" }}
-                      >
-                        Uploaded Documents (
-                        {selectedUser.uploadedDocuments.length})
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {selectedUser.uploadedDocuments.map((doc, index) => (
-                          <Grid item xs={12} sm={6} md={4} key={index}>
-                            <Card
-                              sx={{
-                                background:
-                                  "linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)",
-                                color: "white",
-                                borderRadius: 3,
-                                p: 2,
-                                height: "100%",
-                                boxShadow: "0 8px 25px rgba(78, 205, 196, 0.3)",
-                              }}
-                            >
-                              <Typography
-                                variant="subtitle1"
-                                sx={{ fontWeight: 600, mb: 1 }}
-                              >
-                                {doc.name || `Document ${index + 1}`}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{ opacity: 0.9, fontSize: "0.75rem" }}
-                              >
-                                {doc.type || "Unknown type"}
-                              </Typography>
-                            </Card>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Box>
-                  )}
-
-                {/* No Data Messages */}
-                {(!selectedUser?.managedProjects ||
-                  selectedUser.managedProjects.length === 0) &&
-                  (!selectedUser?.assignedTasks ||
-                    selectedUser.assignedTasks.length === 0) &&
-                  (!selectedUser?.uploadedDocuments ||
-                    selectedUser.uploadedDocuments.length === 0) && (
-                    <Box sx={{ textAlign: "center", py: 4 }}>
-                      <Typography variant="body1" sx={{ color: "#7f8c8d" }}>
-                        No additional data available for this user.
-                      </Typography>
-                    </Box>
-                  )}
               </Box>
             ) : (
               // Create/Edit User Form
@@ -1426,39 +1636,155 @@ const UsersTable = () => {
                 sx={{ maxHeight: "45vh", overflowY: "auto" }}
               >
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
-                  <TextField
-                    fullWidth
-                    label="Full Name"
-                    value={userForm.name}
-                    onChange={(e) =>
-                      setUserForm({ ...userForm, name: e.target.value })
-                    }
-                    required
-                    variant="outlined"
-                    size="small"
-                  />
-                  <TextField
-                    fullWidth
-                    label="Email"
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) =>
-                      setUserForm({ ...userForm, email: e.target.value })
-                    }
-                    required
-                    variant="outlined"
-                    size="small"
-                  />
-                  <TextField
-                    fullWidth
-                    label="Phone"
-                    value={userForm.phone}
-                    onChange={(e) =>
-                      setUserForm({ ...userForm, phone: e.target.value })
-                    }
-                    variant="outlined"
-                    size="small"
-                  />
+                  {activeTab === 0 ? (
+                    <>
+                      <TextField
+                        fullWidth
+                        label="Full Name"
+                        value={userForm.name}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, name: e.target.value })
+                        }
+                        required
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Email"
+                        type="email"
+                        value={userForm.email}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, email: e.target.value })
+                        }
+                        required
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Phone"
+                        value={userForm.phone}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, phone: e.target.value })
+                        }
+                        variant="outlined"
+                        size="small"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <TextField
+                        fullWidth
+                        label="Organization Name"
+                        value={userForm.organization_name}
+                        onChange={(e) =>
+                          setUserForm({
+                            ...userForm,
+                            organization_name: e.target.value,
+                          })
+                        }
+                        required
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Contact Person"
+                        value={userForm.contact_person}
+                        onChange={(e) =>
+                          setUserForm({
+                            ...userForm,
+                            contact_person: e.target.value,
+                          })
+                        }
+                        required
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Email"
+                        type="email"
+                        value={userForm.email}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, email: e.target.value })
+                        }
+                        required
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Phone Number"
+                        value={userForm.phone_number}
+                        onChange={(e) =>
+                          setUserForm({
+                            ...userForm,
+                            phone_number: e.target.value,
+                          })
+                        }
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Address"
+                        value={userForm.address}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, address: e.target.value })
+                        }
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="KRA PIN"
+                        value={userForm.kra_pin}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, kra_pin: e.target.value })
+                        }
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Bank Name"
+                        value={userForm.bank_name}
+                        onChange={(e) =>
+                          setUserForm({
+                            ...userForm,
+                            bank_name: e.target.value,
+                          })
+                        }
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Bank Account Number"
+                        value={userForm.bank_account_number}
+                        onChange={(e) =>
+                          setUserForm({
+                            ...userForm,
+                            bank_account_number: e.target.value,
+                          })
+                        }
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Website"
+                        value={userForm.website}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, website: e.target.value })
+                        }
+                        variant="outlined"
+                        size="small"
+                      />
+                    </>
+                  )}
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
                       Profile Picture
@@ -1510,22 +1836,24 @@ const UsersTable = () => {
                       </Box>
                     )}
                   </Box>
-                  <FormControl fullWidth variant="outlined" size="small">
-                    <InputLabel>Role</InputLabel>
-                    <Select
-                      value={userForm.role}
-                      onChange={(e) =>
-                        setUserForm({ ...userForm, role: e.target.value })
-                      }
-                      label="Role"
-                    >
-                      <MenuItem value="super_admin">Super Admin</MenuItem>
-                      <MenuItem value="project_manager">
-                        Project Manager
-                      </MenuItem>
-                      <MenuItem value="engineer">Engineer</MenuItem>
-                    </Select>
-                  </FormControl>
+                  {activeTab === 0 && (
+                    <FormControl fullWidth variant="outlined" size="small">
+                      <InputLabel>Role</InputLabel>
+                      <Select
+                        value={userForm.role}
+                        onChange={(e) =>
+                          setUserForm({ ...userForm, role: e.target.value })
+                        }
+                        label="Role"
+                      >
+                        <MenuItem value="super_admin">Super Admin</MenuItem>
+                        <MenuItem value="project_manager">
+                          Project Manager
+                        </MenuItem>
+                        <MenuItem value="engineer">Engineer</MenuItem>
+                      </Select>
+                    </FormControl>
+                  )}
                   {openCreateDialog && (
                     <TextField
                       fullWidth
@@ -1644,11 +1972,18 @@ const UsersTable = () => {
                   transition: "all 0.3s ease",
                 }}
                 disabled={
-                  !userForm.name ||
-                  !userForm.email ||
-                  (openCreateDialog && !userForm.password) ||
-                  isCreating ||
-                  isUpdating
+                  activeTab === 0
+                    ? !userForm.name ||
+                      !userForm.email ||
+                      (openCreateDialog && !userForm.password) ||
+                      isCreating ||
+                      isUpdating
+                    : !userForm.organization_name ||
+                      !userForm.contact_person ||
+                      !userForm.email ||
+                      (openCreateDialog && !userForm.password) ||
+                      isCreating ||
+                      isUpdating
                 }
               >
                 {isCreating
@@ -1657,7 +1992,7 @@ const UsersTable = () => {
                   ? "Updating..."
                   : openEditDialog
                   ? "Update User"
-                  : "Create User"}
+                  : "Create Admin"}
               </Button>
             )}
           </DialogActions>
