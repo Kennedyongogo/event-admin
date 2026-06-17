@@ -3,35 +3,34 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
-  Grid,
   Button,
   Chip,
   Stack,
-  Divider,
   CircularProgress,
-  Alert,
-  Container,
+  Divider,
+  alpha,
 } from "@mui/material";
 import {
   ArrowBack as ArrowBackIcon,
   Event as EventIcon,
-  LocationOn as LocationIcon,
-  CalendarToday as CalendarIcon,
-  AccessTime as TimeIcon,
-  Description as DescriptionIcon,
-  AttachMoney as MoneyIcon,
-  Category as CategoryIcon,
-  ConfirmationNumber as TicketIcon,
-  Business as BusinessIcon,
-  Person as PersonIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
-  CalendarMonth as CalendarMonthIcon,
-  Update as UpdateIcon,
-  Image as ImageIcon,
+  CheckCircle as ApproveIcon,
+  Cancel as RejectIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
+import {
+  tickahub,
+  pageShellSx,
+  secondaryButtonSx,
+  primaryButtonSx,
+  dangerButtonSx,
+  SectionCard,
+  SectionLabel,
+  ViewField,
+  PageHeader,
+  eventStatusColor,
+} from "../shared/tickahubPageStyles";
+import { promptApproveEvent, promptRejectEvent, promptDeleteEvent } from "./eventAdminActions";
+import VenueMapView from "./VenueMapView";
 
 const EventView = () => {
   const { id } = useParams();
@@ -39,13 +38,11 @@ const EventView = () => {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [acting, setActing] = useState(false);
 
-  // Helper to build URL for uploaded assets using Vite proxy
   const buildImageUrl = (imageUrl) => {
     if (!imageUrl) return "";
     if (imageUrl.startsWith("http")) return imageUrl;
-
-    // Use relative URLs - Vite proxy will handle routing to backend
     if (imageUrl.startsWith("uploads/")) return `/${imageUrl}`;
     if (imageUrl.startsWith("/uploads/")) return imageUrl;
     return imageUrl;
@@ -60,41 +57,29 @@ const EventView = () => {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem("token");
-
       if (!token) {
         setError("No authentication token found. Please login again.");
         return;
       }
 
       const response = await fetch(`/api/events/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("EventView - Response error:", errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const result = await response.json();
-
-      if (result.success) {
-        setEvent(result.data);
-      } else {
-        setError(result.message || "Failed to fetch event details");
-      }
+      if (result.success) setEvent(result.data);
+      else setError(result.message || "Failed to fetch event details");
     } catch (err) {
-      setError(`Failed to fetch event details: ${err.message}`);
-      console.error("EventView - Error fetching event:", err);
+      setError(`Failed to fetch event: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
+    if (!dateString) return "—";
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
@@ -103,827 +88,217 @@ const EventView = () => {
   };
 
   const formatTime = (timeString) => {
-    if (!timeString) return "N/A";
+    if (!timeString) return "—";
     return new Date(`2000-01-01T${timeString}`).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "pending":
-        return "warning";
-      case "approved":
-        return "success";
-      case "rejected":
-        return "error";
-      case "cancelled":
-        return "default";
-      case "completed":
-        return "info";
-      default:
-        return "default";
-    }
-  };
-
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case "Music":
-        return "primary";
-      case "Sports":
-        return "secondary";
-      case "Conference":
-        return "success";
-      case "Workshop":
-        return "warning";
-      case "Festival":
-        return "info";
-      default:
-        return "default";
+  const runAction = async (action) => {
+    if (!event || acting) return;
+    setActing(true);
+    try {
+      const result = await action(event);
+      if (result.ok) {
+        if (action === promptDeleteEvent) {
+          navigate("/events");
+          return;
+        }
+        await fetchEvent();
+      }
+    } finally {
+      setActing(false);
     }
   };
 
   if (loading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        height="50vh"
-      >
-        <CircularProgress />
+      <Box sx={{ ...pageShellSx, alignItems: "center", justifyContent: "center", minHeight: 280 }}>
+        <CircularProgress sx={{ color: tickahub.cyan }} />
       </Box>
     );
   }
 
-  if (error) {
+  if (error || !event) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate("/events")}
-        >
-          Back to Events
+      <Box sx={pageShellSx}>
+        <Typography sx={{ color: "#ff6b6b", mb: 2 }}>{error || "Event not found"}</Typography>
+        <Button variant="outlined" size="small" startIcon={<ArrowBackIcon />} onClick={() => navigate("/events")} sx={secondaryButtonSx}>
+          Back to events
         </Button>
-      </Container>
+      </Box>
     );
   }
 
-  if (!event) {
-    return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Event not found
-        </Alert>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate("/events")}
-        >
-          Back to Events
-        </Button>
-      </Container>
-    );
-  }
+  const imageSrc = buildImageUrl(event.image_url || event.image);
+  const ticketTiers = Array.isArray(event.ticket_prices) ? event.ticket_prices : [];
+  const isPending = event.status === "pending";
 
   return (
-    <Box
-      sx={{
-        background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-        minHeight: "100vh",
-        py: 3,
-      }}
-    >
-      <Container maxWidth="lg" sx={{ px: 0 }}>
-        {/* Header */}
-        <Box
-          sx={{
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            p: 3,
-            color: "white",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              top: -50,
-              right: -50,
-              width: 200,
-              height: 200,
-              background: "rgba(255, 255, 255, 0.1)",
-              borderRadius: "50%",
-              zIndex: 0,
-            }}
-          />
-          <Box
-            sx={{
-              position: "absolute",
-              bottom: -30,
-              left: -30,
-              width: 150,
-              height: 150,
-              background: "rgba(255, 255, 255, 0.05)",
-              borderRadius: "50%",
-              zIndex: 0,
-            }}
-          />
-          <Box
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
-            position="relative"
-            zIndex={1}
-          >
-            <Box display="flex" alignItems="center" gap={2}>
-              <Button
-                variant="outlined"
-                startIcon={<ArrowBackIcon />}
-                onClick={() => navigate("/events")}
-                sx={{
-                  color: "white",
-                  borderColor: "rgba(255, 255, 255, 0.3)",
-                  "&:hover": {
-                    borderColor: "rgba(255, 255, 255, 0.5)",
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                  },
-                }}
-              >
-                Back
-              </Button>
-              <Box>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    fontWeight: 800,
-                    mb: 1,
-                    textShadow: "0 2px 4px rgba(0,0,0,0.3)",
-                  }}
+    <Box sx={pageShellSx}>
+      <PageHeader
+        icon={EventIcon}
+        title={event.event_name || event.title}
+        subtitle={event.organizer?.organization_name || event.category || "Event review"}
+        action={
+          <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+            <Chip
+              label={event.status}
+              size="small"
+              sx={{
+                bgcolor: `${eventStatusColor(event.status)}22`,
+                color: eventStatusColor(event.status),
+                fontWeight: 700,
+                textTransform: "capitalize",
+              }}
+            />
+            <Button variant="outlined" size="small" startIcon={<ArrowBackIcon />} onClick={() => navigate("/events")} sx={secondaryButtonSx}>
+              Back
+            </Button>
+            {isPending && (
+              <>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={acting}
+                  startIcon={<ApproveIcon />}
+                  onClick={() => runAction(promptApproveEvent)}
+                  sx={primaryButtonSx}
                 >
-                  {event.event_name || event.title}
+                  Approve
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={acting}
+                  startIcon={<RejectIcon />}
+                  onClick={() => runAction(promptRejectEvent)}
+                  sx={dangerButtonSx}
+                >
+                  Reject
+                </Button>
+              </>
+            )}
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={acting}
+              startIcon={<DeleteIcon />}
+              onClick={() => runAction(promptDeleteEvent)}
+              sx={dangerButtonSx}
+            >
+              Delete
+            </Button>
+          </Stack>
+        }
+      />
+
+      <SectionCard
+        sx={{ width: "100%", flex: "none" }}
+        headerBg={`linear-gradient(135deg, ${alpha(tickahub.cyan, 0.14)}, transparent)`}
+        icon={EventIcon}
+        iconColor={tickahub.cyan}
+        title={event.event_name || event.title}
+        subtitle={event.category || "Full event record"}
+      >
+        <Stack spacing={2.5} sx={{ width: "100%" }}>
+          {imageSrc && (
+            <Box
+              component="img"
+              src={imageSrc}
+              alt={event.event_name}
+              sx={{ width: "100%", maxHeight: 280, objectFit: "cover", borderRadius: 2, border: `1px solid ${tickahub.borderSubtle}` }}
+            />
+          )}
+
+          <SectionLabel>Overview</SectionLabel>
+          <ViewField label="description" value={event.description} multiline />
+          <ViewField label="category" value={event.category} />
+          <ViewField label="status" value={event.status} />
+          <ViewField label="commission_rate" value={`${event.commission_rate || 0}%`} />
+
+          <Divider sx={{ borderColor: tickahub.borderSubtle }} />
+          <SectionLabel accent={tickahub.gold}>Schedule</SectionLabel>
+          <ViewField label="event_date" value={formatDate(event.event_date)} />
+          <ViewField label="start_time" value={formatTime(event.start_time)} />
+          <ViewField label="end_time" value={formatTime(event.end_time)} />
+
+          <Divider sx={{ borderColor: tickahub.borderSubtle }} />
+          <SectionLabel>Venue</SectionLabel>
+          <ViewField label="venue" value={event.venue} />
+          <VenueMapView
+            latitude={event.venue_latitude}
+            longitude={event.venue_longitude}
+            venue={event.venue}
+          />
+
+          <Divider sx={{ borderColor: tickahub.borderSubtle }} />
+          <SectionLabel accent={tickahub.gold}>Tickets</SectionLabel>
+          <ViewField label="tickets_available" value={event.tickets_available ?? "—"} />
+          {ticketTiers.length > 0 ? (
+            ticketTiers.map((tier, i) => (
+              <Box
+                key={i}
+                sx={{ width: "100%", p: 1.5, borderRadius: 2, bgcolor: tickahub.navy, border: `1px solid ${tickahub.borderSubtle}` }}
+              >
+                <Typography sx={{ color: tickahub.gold, fontWeight: 700 }}>{tier.category}</Typography>
+                <Typography sx={{ color: "#fff", fontWeight: 800, mt: 0.5 }}>
+                  KES {parseFloat(tier.price)?.toLocaleString()}
                 </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                  Event Details
-                </Typography>
+                {tier.quantity != null && (
+                  <Typography variant="caption" sx={{ color: tickahub.textMuted }}>
+                    Qty: {tier.quantity}
+                  </Typography>
+                )}
               </Box>
-            </Box>
-          </Box>
-        </Box>
+            ))
+          ) : (
+            <Typography sx={{ color: tickahub.textMuted, fontSize: "0.85rem" }}>No pricing tiers set</Typography>
+          )}
 
-        {/* Content */}
-        <Box sx={{ p: 3 }}>
-          <Grid container spacing={3}>
-            {/* Event Image */}
-            {event.image && (
-              <Grid item xs={12}>
-                <Card
-                  sx={{
-                    backgroundColor: "white",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                    border: "1px solid #e0e0e0",
-                    overflow: "hidden",
-                  }}
+          {event.organizer && (
+            <>
+              <Divider sx={{ borderColor: tickahub.borderSubtle }} />
+              <SectionLabel accent={tickahub.gold}>Organizer</SectionLabel>
+              <ViewField label="organization" value={event.organizer.organization_name} />
+              <ViewField label="contact" value={event.organizer.full_name} />
+              <ViewField label="phone" value={event.organizer.phone} />
+              <ViewField label="email" value={event.organizer.email} />
+            </>
+          )}
+
+          {event.purchases?.length > 0 && (
+            <>
+              <Divider sx={{ borderColor: tickahub.borderSubtle }} />
+              <SectionLabel>Purchases</SectionLabel>
+              {event.purchases.map((purchase) => (
+                <Box
+                  key={purchase.id}
+                  sx={{ width: "100%", p: 1.5, borderRadius: 2, bgcolor: tickahub.navy, border: `1px solid ${tickahub.borderSubtle}` }}
                 >
-                  <img
-                    src={buildImageUrl(event.image_url || event.image)}
-                    alt={event.event_name || event.title}
-                    style={{
-                      width: "100%",
-                      height: "400px",
-                      objectFit: "cover",
-                    }}
-                  />
-                </Card>
-              </Grid>
-            )}
+                  <Typography sx={{ color: "#fff", fontWeight: 600 }}>
+                    Qty {purchase.quantity} · {purchase.status}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: tickahub.textMuted }}>
+                    {purchase.createdAt ? new Date(purchase.createdAt).toLocaleString() : "—"}
+                  </Typography>
+                </Box>
+              ))}
+            </>
+          )}
 
-            {/* Event Image */}
-            {event.image_url && (
-              <Grid item xs={12} sx={{ width: "100%" }}>
-                <Card
-                  sx={{
-                    backgroundColor: "white",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                    border: "1px solid #e0e0e0",
-                    width: "100%",
-                    maxWidth: "none",
-                  }}
-                >
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={3}>
-                      <ImageIcon sx={{ color: "#667eea" }} />
-                      <Typography variant="h5" sx={{ color: "#333" }}>
-                        Event Image
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        width: "100%",
-                        height: "500px",
-                        overflow: "hidden",
-                        borderRadius: 3,
-                        backgroundColor: "#f8f9fa",
-                        boxShadow: "inset 0 2px 8px rgba(0,0,0,0.1)",
-                        position: "relative",
-                      }}
-                    >
-                      <img
-                        src={`http://localhost:4000${event.image_url}`}
-                        alt={event.event_name}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          borderRadius: "12px",
-                          transition: "transform 0.3s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.transform = "scale(1.02)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.transform = "scale(1)";
-                        }}
-                        onError={(e) => {
-                          e.target.style.display = "none";
-                          e.target.nextSibling.style.display = "flex";
-                        }}
-                      />
-                      <Box
-                        sx={{
-                          display: "none",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          height: "100%",
-                          color: "#999",
-                          backgroundColor: "#f8f9fa",
-                          borderRadius: "12px",
-                        }}
-                      >
-                        <ImageIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
-                        <Typography variant="h6" sx={{ opacity: 0.7 }}>
-                          Event Image Not Available
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Basic Information */}
-            <Grid item xs={12} sx={{ width: "100%" }}>
-              <Card
-                sx={{
-                  backgroundColor: "white",
-                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                  border: "1px solid #e0e0e0",
-                  width: "100%",
-                  maxWidth: "none",
-                }}
-              >
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={1} mb={3}>
-                    <EventIcon sx={{ color: "#667eea" }} />
-                    <Typography variant="h5" sx={{ color: "#333" }}>
-                      Event Information
-                    </Typography>
-                  </Box>
-                  <Stack spacing={2}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <EventIcon />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Status
-                        </Typography>
-                        <Chip
-                          label={event.status?.toUpperCase()}
-                          color={getStatusColor(event.status)}
-                          size="small"
-                          sx={{ mt: 0.5 }}
-                        />
-                      </Box>
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <CategoryIcon />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Category
-                        </Typography>
-                        <Chip
-                          label={event.category}
-                          color={getCategoryColor(event.category)}
-                          size="small"
-                          sx={{ mt: 0.5 }}
-                        />
-                      </Box>
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <LocationIcon />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Venue
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: "#333" }}>
-                          {event.venue || "Not specified"}
-                        </Typography>
-                        {event.county && (
-                          <Typography variant="caption" sx={{ color: "#999" }}>
-                            {event.county}{" "}
-                            {event.sub_county && `- ${event.sub_county}`}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <CalendarIcon />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Event Date
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: "#333" }}>
-                          {formatDate(event.event_date)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <TimeIcon />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Time
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: "#333" }}>
-                          {formatTime(event.start_time)} -{" "}
-                          {formatTime(event.end_time)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      <MoneyIcon />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Commission Rate
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: "#333" }}>
-                          {event.commission_rate || 0}%
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Description */}
-            {event.description && (
-              <Grid item xs={12} sx={{ width: "100%" }}>
-                <Card
-                  sx={{
-                    backgroundColor: "white",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                    border: "1px solid #e0e0e0",
-                    width: "100%",
-                    maxWidth: "none",
-                  }}
-                >
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={2}>
-                      <DescriptionIcon sx={{ color: "#4facfe" }} />
-                      <Typography variant="h6" sx={{ color: "#333" }}>
-                        Description
-                      </Typography>
-                    </Box>
-                    <Typography variant="body1" sx={{ color: "#333" }}>
-                      {event.description}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Organizer Information */}
-            {event.organizer && (
-              <Grid item xs={12} sx={{ width: "100%" }}>
-                <Card
-                  sx={{
-                    backgroundColor: "white",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                    border: "1px solid #e0e0e0",
-                    width: "100%",
-                    maxWidth: "none",
-                  }}
-                >
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={3}>
-                      <BusinessIcon sx={{ color: "#ff6b6b" }} />
-                      <Typography variant="h6" sx={{ color: "#333" }}>
-                        Organizer Information
-                      </Typography>
-                    </Box>
-                    <Stack spacing={3}>
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <BusinessIcon sx={{ color: "#667eea", fontSize: 20 }} />
-                        <Box>
-                          <Typography variant="body2" sx={{ color: "#666" }}>
-                            Organization Name
-                          </Typography>
-                          <Typography
-                            variant="body1"
-                            sx={{ color: "#333", fontWeight: 500 }}
-                          >
-                            {event.organizer.organization_name}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <PersonIcon sx={{ color: "#667eea", fontSize: 20 }} />
-                        <Box>
-                          <Typography variant="body2" sx={{ color: "#666" }}>
-                            Contact Person
-                          </Typography>
-                          <Typography
-                            variant="body1"
-                            sx={{ color: "#333", fontWeight: 500 }}
-                          >
-                            {event.organizer.contact_person}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <PhoneIcon sx={{ color: "#667eea", fontSize: 20 }} />
-                        <Box>
-                          <Typography variant="body2" sx={{ color: "#666" }}>
-                            Phone Number
-                          </Typography>
-                          <Typography
-                            variant="body1"
-                            sx={{ color: "#333", fontWeight: 500 }}
-                          >
-                            {event.organizer.phone_number}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <EmailIcon sx={{ color: "#667eea", fontSize: 20 }} />
-                        <Box>
-                          <Typography variant="body2" sx={{ color: "#666" }}>
-                            Email
-                          </Typography>
-                          <Typography
-                            variant="body1"
-                            sx={{ color: "#333", fontWeight: 500 }}
-                          >
-                            {event.organizer.email}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Event Metadata */}
-            <Grid item xs={12} sx={{ width: "100%" }}>
-              <Card
-                sx={{
-                  backgroundColor: "white",
-                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                  border: "1px solid #e0e0e0",
-                  width: "100%",
-                  maxWidth: "none",
-                }}
-              >
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={1} mb={3}>
-                    <UpdateIcon sx={{ color: "#28a745" }} />
-                    <Typography variant="h6" sx={{ color: "#333" }}>
-                      Event Details
-                    </Typography>
-                  </Box>
-                  <Stack spacing={3}>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <BusinessIcon sx={{ color: "#28a745", fontSize: 20 }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Organizer
-                        </Typography>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            color: "#333",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {event.organizer?.organization_name || "N/A"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <CalendarMonthIcon
-                        sx={{ color: "#28a745", fontSize: 20 }}
-                      />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Created At
-                        </Typography>
-                        <Typography
-                          variant="body1"
-                          sx={{ color: "#333", fontWeight: 500 }}
-                        >
-                          {new Date(event.createdAt).toLocaleString()}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <UpdateIcon sx={{ color: "#28a745", fontSize: 20 }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          Last Updated
-                        </Typography>
-                        <Typography
-                          variant="body1"
-                          sx={{ color: "#333", fontWeight: 500 }}
-                        >
-                          {new Date(event.updatedAt).toLocaleString()}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Ticket Types */}
-            {event.ticketTypes && event.ticketTypes.length > 0 && (
-              <Grid item xs={12} sx={{ width: "100%" }}>
-                <Card
-                  sx={{
-                    backgroundColor: "white",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                    border: "1px solid #e0e0e0",
-                    width: "100%",
-                    maxWidth: "none",
-                  }}
-                >
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={3}>
-                      <TicketIcon sx={{ color: "#ff6b6b" }} />
-                      <Typography variant="h5" sx={{ color: "#333" }}>
-                        Ticket Types ({event.ticketTypes.length})
-                      </Typography>
-                    </Box>
-                    <Grid container spacing={2}>
-                      {event.ticketTypes.map((ticket, index) => (
-                        <Grid item xs={12} sm={6} md={4} key={index}>
-                          <Card
-                            sx={{
-                              background: event.image_url
-                                ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url(http://localhost:4000${event.image_url})`
-                                : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                              backgroundSize: "cover",
-                              backgroundPosition: "center",
-                              backgroundRepeat: "no-repeat",
-                              color: "white",
-                              borderRadius: 3,
-                              p: 2,
-                              height: "100%",
-                              boxShadow: "0 8px 25px rgba(102, 126, 234, 0.3)",
-                              transition: "all 0.3s ease",
-                              "&:hover": {
-                                transform: "translateY(-5px)",
-                                boxShadow:
-                                  "0 12px 35px rgba(102, 126, 234, 0.4)",
-                              },
-                            }}
-                          >
-                            <Typography
-                              variant="h6"
-                              sx={{
-                                fontWeight: 700,
-                                mb: 2,
-                                textShadow: event.image_url
-                                  ? "2px 2px 4px rgba(0,0,0,0.8)"
-                                  : "none",
-                              }}
-                            >
-                              {ticket.name}
-                            </Typography>
-                            <Typography
-                              variant="h4"
-                              sx={{
-                                fontWeight: 800,
-                                mb: 2,
-                                textShadow: event.image_url
-                                  ? "2px 2px 4px rgba(0,0,0,0.8)"
-                                  : "none",
-                              }}
-                            >
-                              KES {parseFloat(ticket.price)?.toLocaleString()}
-                            </Typography>
-                            <Divider
-                              sx={{
-                                my: 2,
-                                backgroundColor: "rgba(255,255,255,0.3)",
-                              }}
-                            />
-                            <Stack spacing={1}>
-                              <Box
-                                display="flex"
-                                justifyContent="space-between"
-                                alignItems="center"
-                              >
-                                <Typography variant="body2">Total:</Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    fontWeight: 600,
-                                    textShadow: event.image_url
-                                      ? "1px 1px 2px rgba(0,0,0,0.8)"
-                                      : "none",
-                                  }}
-                                >
-                                  {ticket.total_quantity || 0}
-                                </Typography>
-                              </Box>
-                              <Box
-                                display="flex"
-                                justifyContent="space-between"
-                                alignItems="center"
-                              >
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    textShadow: event.image_url
-                                      ? "1px 1px 2px rgba(0,0,0,0.8)"
-                                      : "none",
-                                  }}
-                                >
-                                  Available:
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    fontWeight: 600,
-                                    textShadow: event.image_url
-                                      ? "1px 1px 2px rgba(0,0,0,0.8)"
-                                      : "none",
-                                  }}
-                                >
-                                  {ticket.remaining_quantity || 0}
-                                </Typography>
-                              </Box>
-                              <Box
-                                display="flex"
-                                justifyContent="space-between"
-                                alignItems="center"
-                              >
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    textShadow: event.image_url
-                                      ? "1px 1px 2px rgba(0,0,0,0.8)"
-                                      : "none",
-                                  }}
-                                >
-                                  Sold:
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    fontWeight: 600,
-                                    textShadow: event.image_url
-                                      ? "1px 1px 2px rgba(0,0,0,0.8)"
-                                      : "none",
-                                  }}
-                                >
-                                  {(ticket.total_quantity || 0) -
-                                    (ticket.remaining_quantity || 0)}
-                                </Typography>
-                              </Box>
-                            </Stack>
-                          </Card>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Purchases Information */}
-            {event.purchases && event.purchases.length > 0 && (
-              <Grid item xs={12} sx={{ width: "100%" }}>
-                <Card
-                  sx={{
-                    backgroundColor: "white",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                    border: "1px solid #e0e0e0",
-                    width: "100%",
-                    maxWidth: "none",
-                  }}
-                >
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1} mb={3}>
-                      <MoneyIcon sx={{ color: "#28a745" }} />
-                      <Typography variant="h6" sx={{ color: "#333" }}>
-                        Purchases ({event.purchases.length})
-                      </Typography>
-                    </Box>
-                    <Stack spacing={3}>
-                      {event.purchases.map((purchase, index) => (
-                        <Box key={index}>
-                          <Card
-                            sx={{
-                              background:
-                                "linear-gradient(135deg, #28a745 0%, #20c997 100%)",
-                              color: "white",
-                              borderRadius: 3,
-                              p: 2,
-                              height: "100%",
-                              boxShadow: "0 8px 25px rgba(40, 167, 69, 0.3)",
-                              transition: "all 0.3s ease",
-                              "&:hover": {
-                                transform: "translateY(-5px)",
-                                boxShadow: "0 12px 35px rgba(40, 167, 69, 0.4)",
-                              },
-                            }}
-                          >
-                            <Typography
-                              variant="h6"
-                              sx={{ fontWeight: 700, mb: 2 }}
-                            >
-                              Purchase #{index + 1}
-                            </Typography>
-                            <Stack spacing={1}>
-                              <Box
-                                display="flex"
-                                justifyContent="space-between"
-                                alignItems="center"
-                              >
-                                <Typography variant="body2">Amount:</Typography>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 600 }}
-                                >
-                                  KES {purchase.amount?.toLocaleString() || 0}
-                                </Typography>
-                              </Box>
-                              {purchase.quantity && (
-                                <Box
-                                  display="flex"
-                                  justifyContent="space-between"
-                                  alignItems="center"
-                                >
-                                  <Typography variant="body2">
-                                    Quantity:
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 600 }}
-                                  >
-                                    {purchase.quantity}
-                                  </Typography>
-                                </Box>
-                              )}
-                              {purchase.status && (
-                                <Box
-                                  display="flex"
-                                  justifyContent="space-between"
-                                  alignItems="center"
-                                >
-                                  <Typography variant="body2">
-                                    Status:
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 600 }}
-                                  >
-                                    {purchase.status}
-                                  </Typography>
-                                </Box>
-                              )}
-                            </Stack>
-                          </Card>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        </Box>
-      </Container>
+          <Divider sx={{ borderColor: tickahub.borderSubtle }} />
+          <Stack spacing={0.5} sx={{ color: tickahub.textMuted, fontSize: "0.75rem" }}>
+            <Typography variant="caption">
+              Created {event.createdAt ? new Date(event.createdAt).toLocaleString() : "—"}
+            </Typography>
+            <Typography variant="caption">
+              Updated {event.updatedAt ? new Date(event.updatedAt).toLocaleString() : "—"}
+            </Typography>
+          </Stack>
+        </Stack>
+      </SectionCard>
     </Box>
   );
 };
