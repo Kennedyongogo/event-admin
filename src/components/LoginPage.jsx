@@ -1,31 +1,24 @@
-// import "../Styles/login.scss";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
   Button,
   TextField,
-  Paper,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Card,
-  Snackbar,
-  Alert,
-  Grid,
   Container,
   Stack,
   Divider,
   Fade,
   Slide,
-  Zoom,
   CircularProgress,
   InputAdornment,
   IconButton,
-  useTheme,
+  Chip,
 } from "@mui/material";
 import {
   Visibility,
@@ -33,525 +26,528 @@ import {
   Email,
   Lock,
   Login,
+  ConfirmationNumberRounded,
+  ShieldRounded,
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
+import {
+  tickahub,
+  goldGradient,
+  backgroundGradient,
+} from "../tickahubTheme";
 
-const images = ["/ticka1.png", "/ticka2.png", "/ticka3.png"];
-
-export default function LoginPage(props) {
-  const theme = useTheme();
+export default function LoginPage() {
   const rfEmail = useRef();
   const rsEmail = useRef();
   const rfPassword = useRef();
-  const code = useRef();
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [body, updateBody] = useState({
-    email: null,
-  });
-
+  const [body, updateBody] = useState({ email: null });
   const [openResetDialog, setOpenResetDialog] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [severity, setSeverity] = useState("error");
   const navigate = useNavigate();
 
   const login = async (e) => {
     if (e) e.preventDefault();
 
-    let d = body;
+    const d = { ...body };
     d.email = rfEmail.current.value.toLowerCase().trim();
     d.password = rfPassword.current.value;
     updateBody(d);
 
-    if (!validateEmail(body.email)) {
+    if (!validateEmail(d.email)) {
       Swal.fire({
         icon: "error",
         title: "Invalid Email",
         text: "Please enter a valid email address",
-        confirmButtonColor: theme.palette.primary.main,
+        confirmButtonColor: tickahub.gold,
+        background: tickahub.surface,
+        color: "#fff",
       });
       return;
     }
 
-    if (!validatePassword(body.password)) {
+    if (!validatePassword(d.password)) {
       Swal.fire({
         icon: "error",
         title: "Invalid Password",
         text: "Password must be at least 6 characters",
-        confirmButtonColor: theme.palette.primary.main,
+        confirmButtonColor: tickahub.gold,
+        background: tickahub.surface,
+        color: "#fff",
       });
       return;
     }
 
-    if (validateEmail(body.email) && validatePassword(body.password)) {
-      setLoading(true);
-      Swal.fire({
-        title: "Signing in...",
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
+    setLoading(true);
+    Swal.fire({
+      title: "Signing in...",
+      allowOutsideClick: false,
+      background: tickahub.surface,
+      color: "#fff",
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      const response = await fetch("/api/admins/login", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
+        body: JSON.stringify(d),
       });
+      const data = await response.json();
 
-      try {
-        const response = await fetch("/api/admins/login", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          Swal.fire({
-            icon: "error",
-            title: "Login Failed",
-            text: data.message,
-            confirmButtonColor: theme.palette.primary.main,
-          });
-        } else {
-          // Check if login was successful
-          if (data.success) {
-            Swal.fire({
-              icon: "success",
-              title: "Success!",
-              text: data.message,
-              timer: 1500,
-              showConfirmButton: false,
-            });
-            localStorage.setItem("token", data.data.token);
-            localStorage.setItem("userRole", data.data.admin.role);
-            localStorage.setItem("user", JSON.stringify(data.data.admin));
-            setTimeout(() => {
-              navigate("/analytics");
-            }, 1500);
-          } else {
-            Swal.fire({
-              icon: "error",
-              title: "Login Failed",
-              text: data.message,
-              confirmButtonColor: theme.palette.primary.main,
-            });
-          }
-        }
-      } catch (err) {
+      if (!response.ok) {
         Swal.fire({
           icon: "error",
-          title: "Error",
-          text: "Login failed. Please try again.",
-          confirmButtonColor: theme.palette.primary.main,
+          title: "Login Failed",
+          text: data.message,
+          confirmButtonColor: tickahub.gold,
+          background: tickahub.surface,
+          color: "#fff",
         });
-      } finally {
-        setLoading(false);
+      } else if (data.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Welcome back",
+          text: data.message,
+          timer: 1500,
+          showConfirmButton: false,
+          background: tickahub.surface,
+          color: "#fff",
+        });
+        localStorage.setItem("token", data.data.token);
+        localStorage.setItem("userRole", data.data.admin.role);
+        localStorage.setItem("user", JSON.stringify(data.data.admin));
+        setTimeout(() => navigate("/analytics"), 1500);
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Login Failed",
+          text: data.message,
+          confirmButtonColor: tickahub.gold,
+          background: tickahub.surface,
+          color: "#fff",
+        });
       }
+    } catch {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Login failed. Please try again.",
+        confirmButtonColor: tickahub.gold,
+        background: tickahub.surface,
+        color: "#fff",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const reset = async () => {
-    let d = { Email: rsEmail.current.value.toLowerCase().trim() };
+    const email = rsEmail.current.value.toLowerCase().trim();
 
-    if (!validateEmail(d.Email)) {
+    if (!validateEmail(email)) {
       Swal.fire({
         icon: "error",
         title: "Invalid Email",
         text: "Please enter a valid email address",
-        confirmButtonColor: theme.palette.primary.main,
+        confirmButtonColor: tickahub.gold,
+        background: tickahub.surface,
+        color: "#fff",
       });
       return;
     }
 
-    if (validateEmail(d.Email)) {
-      setResetLoading(true);
-      Swal.fire({
-        title: "Processing...",
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
+    setResetLoading(true);
+    Swal.fire({
+      title: "Processing...",
+      allowOutsideClick: false,
+      background: tickahub.surface,
+      color: "#fff",
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      const response = await fetch("/api/admins/forgot-password", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
+        body: JSON.stringify({ Email: email }),
       });
+      const data = await response.json();
 
-      try {
-        const response = await fetch("/api/admins/forgot-password", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(d),
+      if (response.ok) {
+        setOpenResetDialog(false);
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: data.message,
+          confirmButtonColor: tickahub.gold,
+          background: tickahub.surface,
+          color: "#fff",
         });
-        const data = await response.json();
-
-        if (response.ok) {
-          setOpenResetDialog(false);
-          Swal.fire({
-            icon: "success",
-            title: "Success",
-            text: data.message,
-            confirmButtonColor: theme.palette.primary.main,
-          });
-        } else {
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: data.message,
-            confirmButtonColor: theme.palette.primary.main,
-          });
-        }
-      } catch (err) {
+      } else {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: "Something went wrong. Please try again.",
-          confirmButtonColor: theme.palette.primary.main,
+          text: data.message,
+          confirmButtonColor: tickahub.gold,
+          background: tickahub.surface,
+          color: "#fff",
         });
-      } finally {
-        setResetLoading(false);
       }
+    } catch {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Something went wrong. Please try again.",
+        confirmButtonColor: tickahub.gold,
+        background: tickahub.surface,
+        color: "#fff",
+      });
+    } finally {
+      setResetLoading(false);
     }
   };
 
-  const validateEmail = (email) => {
-    return String(email)
+  const validateEmail = (email) =>
+    String(email)
       .toLowerCase()
       .match(
         /^(([^<>()[\]/.,;:\s@"]+(\.[^<>()[\]/.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
       );
+
+  const validatePassword = (password) => password.length >= 6;
+
+  const fieldSx = {
+    "& .MuiOutlinedInput-root": {
+      backgroundColor: tickahub.navyLight,
+      borderRadius: 3,
+      transition: "all 0.2s ease",
+      "& fieldset": {
+        borderColor: tickahub.borderLight,
+      },
+      "&:hover fieldset": {
+        borderColor: "rgba(255, 255, 255, 0.28)",
+      },
+      "&.Mui-focused fieldset": {
+        borderColor: tickahub.gold,
+        borderWidth: 2,
+      },
+      "&.Mui-focused": {
+        boxShadow: `0 0 0 4px ${tickahub.gold}22`,
+      },
+    },
+    "& .MuiInputLabel-root": {
+      color: tickahub.textMuted,
+      "&.Mui-focused": { color: tickahub.gold },
+    },
+    "& .MuiInputBase-input": {
+      color: "#fff",
+    },
   };
-
-  const validatePassword = (password) => {
-    return password.length >= 6;
-  };
-
-  useEffect(() => {
-    let currentIndex = 0;
-    const backgroundElement = document.querySelector(".login-background");
-
-    // Preload images
-    images.forEach((imageSrc) => {
-      const img = new Image();
-      img.src = imageSrc;
-    });
-
-    const changeBackground = () => {
-      if (backgroundElement) {
-        // Fade out current image
-        backgroundElement.style.opacity = 0;
-
-        setTimeout(() => {
-          currentIndex = (currentIndex + 1) % images.length;
-          backgroundElement.style.backgroundImage = `url(${images[currentIndex]})`;
-          // Fade in new image
-          backgroundElement.style.opacity = 1;
-        }, 500);
-      }
-    };
-
-    // Initial setup
-    if (backgroundElement) {
-      backgroundElement.style.transition = "opacity 1s ease-in-out";
-      backgroundElement.style.opacity = 1;
-    }
-
-    const intervalId = setInterval(changeBackground, 5000); // Change every 5 seconds for testing
-
-    return () => clearInterval(intervalId);
-  }, []);
 
   return (
     <Box
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      minHeight="100vh"
-      position="relative"
-      sx={{ overflow: "hidden" }}
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+        overflow: "hidden",
+        background: backgroundGradient,
+      }}
     >
-      <div
-        className="login-background"
-        style={{
+      {/* Ambient glow orbs — no background images */}
+      <Box
+        sx={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundImage: `url(${images[0]})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-          transition: "opacity 1s ease-in-out",
-          backgroundColor: "#2c3e50", // Professional dark blue background
+          width: 420,
+          height: 420,
+          top: "-8%",
+          right: "-6%",
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${tickahub.gold}30 0%, transparent 70%)`,
+          filter: "blur(40px)",
+          pointerEvents: "none",
         }}
       />
       <Box
         sx={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background: `linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 100%)`,
-          backdropFilter: "blur(0px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          width: 360,
+          height: 360,
+          bottom: "-10%",
+          left: "-8%",
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${tickahub.cyan}22 0%, transparent 70%)`,
+          filter: "blur(48px)",
+          pointerEvents: "none",
         }}
-      >
-        <Container maxWidth="lg">
-          <Grid
-            container
-            spacing={4}
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Fade in timeout={1000}>
-                <Stack
-                  spacing={4}
-                  alignItems={{ xs: "center", md: "flex-start" }}
-                >
-                  <Slide direction="up" in timeout={1200}>
-                    <Box>
-                      <Typography
-                        variant="h1"
-                        sx={{
-                          color: "#fff",
-                          fontWeight: 800,
-                          fontSize: {
-                            xs: "3rem",
-                            sm: "4rem",
-                            md: "5rem",
-                            lg: "6rem",
-                          },
-                          textAlign: { xs: "center", md: "left" },
-                          letterSpacing: "2px",
-                          mb: 2,
-                          background: `linear-gradient(45deg, ${theme.palette.primary.light}, ${theme.palette.secondary.light})`,
-                          backgroundClip: "text",
-                          WebkitBackgroundClip: "text",
-                          WebkitTextFillColor: "transparent",
-                          textShadow: "0 0 30px rgba(255,255,255,0.3)",
-                        }}
-                      >
-                        TickaZone
-                      </Typography>
-                    </Box>
-                  </Slide>
-                </Stack>
-              </Fade>
-            </Grid>
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          width: 200,
+          height: 200,
+          top: "40%",
+          left: "30%",
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${tickahub.gold}12 0%, transparent 70%)`,
+          filter: "blur(32px)",
+          pointerEvents: "none",
+        }}
+      />
 
-            <Grid
-              size={{ xs: 12, md: 6 }}
-              sx={{ display: "flex", justifyContent: "center" }}
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1, py: 4 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            gap: { xs: 4, md: 6, lg: 10 },
+            alignItems: "center",
+          }}
+        >
+          {/* Brand panel */}
+          <Fade in timeout={800}>
+            <Stack
+              spacing={3}
+              alignItems={{ xs: "center", md: "flex-start" }}
+              textAlign={{ xs: "center", md: "left" }}
             >
-              <Slide direction="left" in timeout={1500}>
-                <Card
-                  elevation={0}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Box
+                  component="img"
+                  src="/tickahub.png"
+                  alt="TickaHub"
                   sx={{
-                    p: 4,
-                    maxWidth: 450,
-                    width: "100%",
-                    borderRadius: 4,
-                    background: "rgba(255, 255, 255, 0.1)",
-                    backdropFilter: "blur(25px)",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
-                    transition: "all 0.3s ease-in-out",
+                    width: 64,
+                    height: 64,
+                    borderRadius: 3,
+                    boxShadow: `0 12px 32px ${tickahub.gold}33`,
+                  }}
+                />
+                <Box>
+                  <Typography
+                    variant="h3"
+                    sx={{
+                      fontWeight: 900,
+                      letterSpacing: "-0.03em",
+                      background: goldGradient,
+                      backgroundClip: "text",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    TickaHub
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: tickahub.textMuted, fontWeight: 600 }}
+                  >
+                    Admin Portal
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 800,
+                  color: "#fff",
+                  letterSpacing: "-0.02em",
+                  maxWidth: 440,
+                  fontSize: { xs: "1.75rem", md: "2rem" },
+                }}
+              >
+                Manage events, tickets & insights in one place
+              </Typography>
+
+              <Typography
+                variant="body1"
+                sx={{
+                  color: tickahub.textMuted,
+                  maxWidth: 420,
+                  lineHeight: 1.6,
+                  fontSize: "1.05rem",
+                }}
+              >
+                The same premium experience as the mobile app — built for
+                organizers and platform admins.
+              </Typography>
+
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Chip
+                  icon={<ConfirmationNumberRounded sx={{ color: `${tickahub.gold} !important` }} />}
+                  label="Events & tickets"
+                  size="small"
+                  sx={{
+                    bgcolor: `${tickahub.surface}`,
+                    border: `1px solid ${tickahub.borderLight}`,
+                    color: "#fff",
+                    fontWeight: 600,
+                  }}
+                />
+                <Chip
+                  icon={<ShieldRounded sx={{ color: `${tickahub.cyan} !important` }} />}
+                  label="Secure admin access"
+                  size="small"
+                  sx={{
+                    bgcolor: `${tickahub.surface}`,
+                    border: `1px solid ${tickahub.borderLight}`,
+                    color: "#fff",
+                    fontWeight: 600,
+                  }}
+                />
+              </Stack>
+            </Stack>
+          </Fade>
+
+          {/* Sign-in card */}
+          <Slide direction="up" in timeout={600}>
+            <Box
+              sx={{
+                width: "100%",
+                maxWidth: 440,
+                mx: "auto",
+                p: { xs: 3, sm: 4 },
+                borderRadius: 4,
+                bgcolor: tickahub.surface,
+                border: `1px solid ${tickahub.borderLight}`,
+                boxShadow: `0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px ${tickahub.borderSubtle}`,
+              }}
+            >
+              <Stack spacing={0.5} sx={{ mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 800, color: "#fff" }}>
+                  Sign in
+                </Typography>
+                <Typography variant="body2" sx={{ color: tickahub.textMuted }}>
+                  Enter your admin credentials to continue
+                </Typography>
+              </Stack>
+
+              <form onSubmit={login}>
+                <TextField
+                  inputRef={rfEmail}
+                  type="email"
+                  label="Email address"
+                  fullWidth
+                  margin="normal"
+                  variant="outlined"
+                  autoComplete="email"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Email sx={{ color: tickahub.textMuted, fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={fieldSx}
+                />
+
+                <TextField
+                  inputRef={rfPassword}
+                  type={showPassword ? "text" : "password"}
+                  label="Password"
+                  fullWidth
+                  margin="normal"
+                  variant="outlined"
+                  autoComplete="current-password"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Lock sx={{ color: tickahub.textMuted, fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => setShowPassword(!showPassword)}
+                          edge="end"
+                          aria-label="toggle password"
+                          sx={{ color: tickahub.textMuted }}
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={fieldSx}
+                />
+
+                <Typography
+                  variant="body2"
+                  align="right"
+                  sx={{
+                    mt: 1.5,
+                    color: tickahub.cyan,
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    "&:hover": { textDecoration: "underline" },
+                  }}
+                  onClick={() => setOpenResetDialog(true)}
+                >
+                  Forgot password?
+                </Typography>
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  fullWidth
+                  size="large"
+                  disabled={loading}
+                  startIcon={
+                    loading ? (
+                      <CircularProgress size={20} sx={{ color: tickahub.navy }} />
+                    ) : (
+                      <Login />
+                    )
+                  }
+                  sx={{
+                    mt: 3,
+                    py: 1.6,
+                    background: goldGradient,
+                    color: tickahub.navy,
+                    fontSize: "1rem",
+                    fontWeight: 800,
+                    boxShadow: `0 8px 24px ${tickahub.gold}44`,
                     "&:hover": {
-                      transform: "translateY(-5px)",
-                      boxShadow: "0 12px 40px rgba(0, 0, 0, 0.3)",
-                      border: "1px solid rgba(255, 255, 255, 0.3)",
+                      background: `linear-gradient(135deg, ${tickahub.goldDark}, ${tickahub.gold})`,
+                      boxShadow: `0 12px 28px ${tickahub.gold}55`,
+                      transform: "translateY(-1px)",
+                    },
+                    "&:disabled": {
+                      background: tickahub.surfaceElevated,
+                      color: tickahub.textMuted,
                     },
                   }}
                 >
-                  <form onSubmit={login}>
-                    <Typography
-                      textAlign="center"
-                      fontWeight="700"
-                      color="white"
-                      variant="h4"
-                      sx={{
-                        mb: 3,
-                        textShadow: "2px 2px 4px rgba(0,0,0,0.5)",
-                        letterSpacing: "1px",
-                      }}
-                    >
-                      Sign In
-                    </Typography>
-
-                    <TextField
-                      inputRef={rfEmail}
-                      type="email"
-                      label="Email Address"
-                      fullWidth
-                      margin="normal"
-                      variant="outlined"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Email sx={{ color: "rgba(255,255,255,0.7)" }} />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          backgroundColor: "rgba(255, 255, 255, 0.15)",
-                          borderRadius: 3,
-                          border: "1px solid rgba(255, 255, 255, 0.2)",
-                          transition: "all 0.3s ease",
-                          "&:hover": {
-                            backgroundColor: "rgba(255, 255, 255, 0.2)",
-                            border: "1px solid rgba(255, 255, 255, 0.4)",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "rgba(255, 255, 255, 0.25)",
-                            border: `2px solid ${theme.palette.primary.light}`,
-                            boxShadow: `0 0 20px ${theme.palette.primary.main}40`,
-                          },
-                        },
-                        "& .MuiInputLabel-root": {
-                          color: "rgba(255, 255, 255, 0.8)",
-                          "&.Mui-focused": {
-                            color: theme.palette.primary.light,
-                          },
-                        },
-                        "& .MuiInputBase-input": {
-                          color: "white",
-                          "&::placeholder": {
-                            color: "rgba(255, 255, 255, 0.6)",
-                          },
-                        },
-                      }}
-                    />
-
-                    <TextField
-                      inputRef={rfPassword}
-                      type={showPassword ? "text" : "password"}
-                      label="Password"
-                      fullWidth
-                      margin="normal"
-                      variant="outlined"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Lock sx={{ color: "rgba(255,255,255,0.7)" }} />
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              onClick={() => setShowPassword(!showPassword)}
-                              edge="end"
-                              sx={{ color: "rgba(255,255,255,0.7)" }}
-                            >
-                              {showPassword ? (
-                                <VisibilityOff />
-                              ) : (
-                                <Visibility />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          backgroundColor: "rgba(255, 255, 255, 0.15)",
-                          borderRadius: 3,
-                          border: "1px solid rgba(255, 255, 255, 0.2)",
-                          transition: "all 0.3s ease",
-                          "&:hover": {
-                            backgroundColor: "rgba(255, 255, 255, 0.2)",
-                            border: "1px solid rgba(255, 255, 255, 0.4)",
-                          },
-                          "&.Mui-focused": {
-                            backgroundColor: "rgba(255, 255, 255, 0.25)",
-                            border: `2px solid ${theme.palette.primary.light}`,
-                            boxShadow: `0 0 20px ${theme.palette.primary.main}40`,
-                          },
-                        },
-                        "& .MuiInputLabel-root": {
-                          color: "rgba(255, 255, 255, 0.8)",
-                          "&.Mui-focused": {
-                            color: theme.palette.primary.light,
-                          },
-                        },
-                        "& .MuiInputBase-input": {
-                          color: "white",
-                          "&::placeholder": {
-                            color: "rgba(255, 255, 255, 0.6)",
-                          },
-                        },
-                      }}
-                    />
-
-                    <Typography
-                      variant="body2"
-                      color="white"
-                      align="center"
-                      sx={{
-                        mt: 2,
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                        "&:hover": {
-                          textDecoration: "underline",
-                          color: theme.palette.primary.light,
-                          transform: "scale(1.05)",
-                        },
-                      }}
-                      onClick={() => setOpenResetDialog(true)}
-                    >
-                      Forgot password? Click here
-                    </Typography>
-
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      fullWidth
-                      size="large"
-                      disabled={loading}
-                      startIcon={
-                        loading ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <Login />
-                        )
-                      }
-                      sx={{
-                        mt: 3,
-                        py: 1.5,
-                        borderRadius: 3,
-                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
-                        boxShadow: `0 4px 15px ${theme.palette.primary.main}40`,
-                        transition: "all 0.3s ease",
-                        textTransform: "none",
-                        fontSize: "1.1rem",
-                        fontWeight: 600,
-                        letterSpacing: "0.5px",
-                        "&:hover": {
-                          background: `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                          boxShadow: `0 6px 20px ${theme.palette.primary.main}60`,
-                          transform: "translateY(-2px)",
-                        },
-                        "&:disabled": {
-                          background: "rgba(255, 255, 255, 0.2)",
-                          color: theme.palette.primary.main,
-                        },
-                      }}
-                    >
-                      {loading ? "Signing In..." : "Sign In"}
-                    </Button>
-                  </form>
-                </Card>
-              </Slide>
-            </Grid>
-          </Grid>
-        </Container>
-      </Box>
+                  {loading ? "Signing in..." : "Sign in"}
+                </Button>
+              </form>
+            </Box>
+          </Slide>
+        </Box>
+      </Container>
 
       <Dialog
         open={openResetDialog}
@@ -560,20 +556,27 @@ export default function LoginPage(props) {
         maxWidth="xs"
         TransitionComponent={Slide}
         transitionDuration={300}
+        PaperProps={{
+          sx: {
+            bgcolor: tickahub.surface,
+            border: `1px solid ${tickahub.borderLight}`,
+            borderRadius: 3,
+          },
+        }}
       >
         <DialogTitle
           sx={{
-            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
-            color: "white",
-            fontWeight: 600,
+            background: goldGradient,
+            color: tickahub.navy,
+            fontWeight: 800,
           }}
         >
-          Reset Password
+          Reset password
         </DialogTitle>
         <Divider />
         <DialogContent sx={{ pt: 3 }}>
-          <DialogContentText sx={{ mb: 2 }}>
-            Please enter your email address to reset your password.
+          <DialogContentText sx={{ mb: 2, color: tickahub.textMuted }}>
+            Enter your email and we&apos;ll send reset instructions.
           </DialogContentText>
           <form
             onSubmit={(e) => {
@@ -584,32 +587,45 @@ export default function LoginPage(props) {
             <TextField
               inputRef={rsEmail}
               type="email"
-              label="Email Address"
+              label="Email address"
               fullWidth
               margin="normal"
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Email />
+                    <Email sx={{ color: tickahub.textMuted }} />
                   </InputAdornment>
                 ),
               }}
+              sx={fieldSx}
             />
-            <DialogActions sx={{ mt: 2 }}>
+            <DialogActions sx={{ mt: 2, px: 0 }}>
               <Button
                 onClick={() => setOpenResetDialog(false)}
                 variant="outlined"
-                color="primary"
                 disabled={resetLoading}
+                sx={{
+                  borderColor: tickahub.borderLight,
+                  color: "#fff",
+                }}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="contained"
-                color="primary"
                 disabled={resetLoading}
-                startIcon={resetLoading ? <CircularProgress size={16} /> : null}
+                startIcon={
+                  resetLoading ? <CircularProgress size={16} /> : null
+                }
+                sx={{
+                  background: goldGradient,
+                  color: tickahub.navy,
+                  fontWeight: 700,
+                  "&:hover": {
+                    background: `linear-gradient(135deg, ${tickahub.goldDark}, ${tickahub.gold})`,
+                  },
+                }}
               >
                 {resetLoading ? "Processing..." : "Submit"}
               </Button>

@@ -15,8 +15,9 @@ import ListItem from "@mui/material/ListItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import { Box } from "@mui/material";
-import Header from "./Header/Header";
 import { Gear } from "@phosphor-icons/react";
+import { tickahub, goldGradient, heroGradient } from "../tickahubTheme";
+import Header from "./Header/Header";
 
 const drawerWidth = 300;
 
@@ -43,11 +44,12 @@ const closedMixin = (theme) => ({
 
 const DrawerHeader = styled("div")(({ theme }) => ({
   display: "flex",
-  alignItems: "flex-start",
+  alignItems: "center",
   justifyContent: "space-between",
-  padding: theme.spacing(1, 0, 1, 1),
-  backgroundColor: "#fff",
-  color: "#2596be",
+  padding: theme.spacing(1.5, 2),
+  backgroundColor: tickahub.surfaceElevated,
+  color: tickahub.gold,
+  borderBottom: `1px solid ${tickahub.borderSubtle}`,
   ...theme.mixins.toolbar,
 }));
 
@@ -55,8 +57,9 @@ const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
   zIndex: theme.zIndex.drawer + 1,
-  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-  boxShadow: "0 4px 20px rgba(102, 126, 234, 0.3)",
+  background: heroGradient,
+  borderBottom: `1px solid ${tickahub.borderSubtle}`,
+  boxShadow: "0 4px 24px rgba(0, 0, 0, 0.35)",
   transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
@@ -78,7 +81,12 @@ const Drawer = styled(MuiDrawer, {
   flexShrink: 0,
   whiteSpace: "nowrap",
   boxSizing: "border-box",
-  overflowY: "hidden", // Disable vertical scrollbar
+  overflowY: "hidden",
+  "& .MuiDrawer-paper": {
+    backgroundColor: tickahub.surface,
+    borderRight: `1px solid ${tickahub.borderSubtle}`,
+    color: "#fff",
+  },
   ...(open && {
     ...openedMixin(theme),
     "& .MuiDrawer-paper": openedMixin(theme),
@@ -145,18 +153,34 @@ const Navbar = (props) => {
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
       <AppBar position="fixed" open={open}>
-        <Toolbar>
-          <Header
-            setUser={props.setUser}
-            handleDrawerOpen={handleDrawerOpen}
-            open={open}
-          />
+        <Toolbar sx={{ px: { xs: 1, sm: 2 } }}>
+          <Header setUser={props.setUser} handleDrawerOpen={handleDrawerOpen} open={open} />
         </Toolbar>
       </AppBar>
       <Drawer variant="permanent" open={open}>
         <DrawerHeader>
-          <Box></Box>
-          <IconButton onClick={handleDrawerClose}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, pl: 0.5 }}>
+            <Box
+              component="img"
+              src="/tickahub.png"
+              alt="TickaHub"
+              sx={{ width: 32, height: 32, borderRadius: 1.5 }}
+            />
+            <Box
+              component="span"
+              sx={{
+                fontWeight: 800,
+                fontSize: "0.95rem",
+                background: goldGradient,
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              TickaHub
+            </Box>
+          </Box>
+          <IconButton onClick={handleDrawerClose} sx={{ color: "#fff" }}>
             {theme.direction === "rtl" ? (
               <ChevronRightIcon />
             ) : (
@@ -176,8 +200,13 @@ const Navbar = (props) => {
                 cursor: "pointer",
                 bgcolor:
                   location.pathname === item.path
-                    ? "action.selected"
+                    ? `${tickahub.gold}18`
                     : "transparent",
+                borderLeft:
+                  location.pathname === item.path
+                    ? `3px solid ${tickahub.gold}`
+                    : "3px solid transparent",
+                "&:hover": { bgcolor: `${tickahub.gold}10` },
               }}
             >
               <ListItemIcon>
@@ -205,7 +234,7 @@ const Navbar = (props) => {
         </List>
         <Divider />
         <List>
-          {user && user.role === "super_admin" && (
+          {user && (
             <ListItem
               button
               onClick={() => navigate("/users")}
@@ -214,8 +243,13 @@ const Navbar = (props) => {
                 cursor: "pointer",
                 bgcolor:
                   location.pathname === "/users"
-                    ? "action.selected"
+                    ? `${tickahub.gold}18`
                     : "transparent",
+                borderLeft:
+                  location.pathname === "/users"
+                    ? `3px solid ${tickahub.gold}`
+                    : "3px solid transparent",
+                "&:hover": { bgcolor: `${tickahub.gold}10` },
               }}
             >
               <ListItemIcon>
@@ -247,8 +281,13 @@ const Navbar = (props) => {
               cursor: "pointer",
               bgcolor:
                 location.pathname === "/settings"
-                  ? "action.selected"
+                  ? `${tickahub.gold}18`
                   : "transparent",
+              borderLeft:
+                location.pathname === "/settings"
+                  ? `3px solid ${tickahub.gold}`
+                  : "3px solid transparent",
+              "&:hover": { bgcolor: `${tickahub.gold}10` },
             }}
           >
             <ListItemIcon>
@@ -274,7 +313,14 @@ const Navbar = (props) => {
               }}
             />
           </ListItem>
-          <ListItem button onClick={logout} sx={{ cursor: "pointer" }}>
+          <ListItem
+            button
+            onClick={logout}
+            sx={{
+              cursor: "pointer",
+              "&:hover": { bgcolor: "rgba(248, 113, 113, 0.1)" },
+            }}
+          >
             <ListItemIcon>
               <Logout />
             </ListItemIcon>
