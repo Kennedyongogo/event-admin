@@ -31,6 +31,7 @@ import {
 } from "../shared/tickahubPageStyles";
 import { promptApproveEvent, promptRejectEvent, promptDeleteEvent } from "./eventAdminActions";
 import VenueMapView from "./VenueMapView";
+import EventLineupView from "./EventLineupView";
 
 const EventView = () => {
   const { id } = useParams();
@@ -232,6 +233,10 @@ const EventView = () => {
             longitude={event.venue_longitude}
             venue={event.venue}
           />
+
+          <Divider sx={{ borderColor: tickahub.borderSubtle }} />
+          <SectionLabel accent={tickahub.gold}>Lineup</SectionLabel>
+          <EventLineupView lineup={event.lineup} />
 
           <Divider sx={{ borderColor: tickahub.borderSubtle }} />
           <SectionLabel accent={tickahub.gold}>Tickets</SectionLabel>
