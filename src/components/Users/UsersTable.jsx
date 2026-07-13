@@ -100,7 +100,6 @@ const TABLE_COLUMNS = {
     { key: "full_name", label: "full_name" },
     { key: "email", label: "email" },
     { key: "phone", label: "phone" },
-    { key: "genre", label: "genres" },
     { key: "isActive", label: "isActive" },
   ],
 };
