@@ -45,6 +45,7 @@ import {
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
 import { tickahub, goldGradient, cyanGradient, backgroundGradient } from "../../tickahubTheme";
+import { formatGenresDisplay, parseArtistGenres } from "../../utils/artistGenres";
 
 const ROLE_TABS = [
   {
@@ -99,7 +100,7 @@ const TABLE_COLUMNS = {
     { key: "full_name", label: "full_name" },
     { key: "email", label: "email" },
     { key: "phone", label: "phone" },
-    { key: "genre", label: "genre" },
+    { key: "genre", label: "genres" },
     { key: "isActive", label: "isActive" },
   ],
 };
@@ -136,7 +137,7 @@ const ROLE_FIELDS = {
     { key: "email", label: "email", type: "text", viewOnly: true },
     { key: "phone", label: "phone", type: "text", viewOnly: true },
     { key: "bio", label: "bio", type: "textarea", viewOnly: true },
-    { key: "genre", label: "genre", type: "text", viewOnly: true },
+    { key: "genre", label: "genres", type: "genres", viewOnly: true },
     { key: "profile_image", label: "profile_image", type: "image", viewOnly: true },
     { key: "facebook_url", label: "facebook_url", type: "text", viewOnly: true },
     { key: "instagram_url", label: "instagram_url", type: "text", viewOnly: true },
@@ -206,6 +207,27 @@ const organizerStatusColor = (status) => {
 
 const formatCellValue = (key, user) => {
   const value = user[key];
+  if (key === "genre") {
+    const genres = parseArtistGenres(value);
+    if (!genres.length) return "—";
+    return (
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+        {genres.map((genre) => (
+          <Chip
+            key={genre}
+            label={genre}
+            size="small"
+            sx={{
+              bgcolor: `${tickahub.cyan}22`,
+              color: tickahub.cyan,
+              fontWeight: 600,
+              fontSize: "0.68rem",
+            }}
+          />
+        ))}
+      </Box>
+    );
+  }
   if (key === "isActive") {
     return (
       <Chip
@@ -291,7 +313,10 @@ const UsersTable = () => {
     const q = search.toLowerCase();
     return users.filter((user) =>
       columns
-        .map((col) => user[col.key])
+        .map((col) => {
+          if (col.key === "genre") return formatGenresDisplay(user[col.key]);
+          return user[col.key];
+        })
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -518,6 +543,32 @@ const UsersTable = () => {
       return (
         <FieldBlock key={field.key} label={field.label}>
           <Typography sx={{ color: "#fff", fontSize: "0.9rem" }}>{formatDateTime(value)}</Typography>
+        </FieldBlock>
+      );
+    }
+
+    if (field.type === "genres") {
+      const genres = parseArtistGenres(value);
+      return (
+        <FieldBlock key={field.key} label={field.label}>
+          {genres.length ? (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+              {genres.map((genre) => (
+                <Chip
+                  key={genre}
+                  label={genre}
+                  size="small"
+                  sx={{
+                    bgcolor: `${tickahub.cyan}22`,
+                    color: tickahub.cyan,
+                    fontWeight: 600,
+                  }}
+                />
+              ))}
+            </Box>
+          ) : (
+            <Typography sx={{ color: tickahub.textMuted }}>—</Typography>
+          )}
         </FieldBlock>
       );
     }
